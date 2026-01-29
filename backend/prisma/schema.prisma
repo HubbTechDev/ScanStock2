@@ -1,0 +1,318 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id
+  email         String    @unique
+  name          String?
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  Profile Profile?
+
+  // Organization membership
+  organizationMemberships OrganizationMember[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}
+
+model Profile {
+  id     Int    @id @default(autoincrement())
+  handle String @unique
+  user   User   @relation(fields: [userId], references: [id])
+  userId String @unique
+}
+
+// Organization for team-based inventory sharing
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  inviteCode  String   @unique // 6-character code for joining
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members        OrganizationMember[]
+  inventoryItems InventoryItem[]
+  prepItems      PrepItem[]
+  cycleCounts    CycleCount[]
+  vendors        Vendor[]
+  orders         Order[]
+
+  @@map("organization")
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member") // owner, admin, member
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+  @@map("organization_member")
+}
+
+model InventoryItem {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  imageUrl       String
+  binNumber      String
+  rackNumber     String
+  platform       String
+  status         String        @default("pending") // pending, completed, sold
+  quantity       Int           @default(1)        // Quantity of items
+  parLevel       Int?          // Minimum quantity to maintain
+  cost           Float?        // Cost of goods (purchase price)
+  soldAt         DateTime?
+  soldPrice      Float?
+  shipByDate     DateTime?
+  shipperQrCode  String?       // URL to the shipper's QR code image
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  reminders      Reminder[]
+  cycleCountItems CycleCountItem[]
+  vendorProducts  VendorProduct[]
+  orderItems      OrderItem[]
+
+  // Organization ownership
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_item")
+}
+
+model Reminder {
+  id              String        @id @default(uuid())
+  itemId          String
+  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  reminderDate    DateTime
+  note            String?
+  isCompleted     Boolean       @default(false)
+  notificationId  String?       // Expo notification identifier for cancellation
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("reminder")
+}
+
+// Prep Item for restaurant prep sheets
+model PrepItem {
+  id             String        @id @default(uuid())
+  name           String
+  category       String        // e.g., "Produce", "Meat", "Dairy"
+  itemType       String        @default("ingredient") // "ingredient" or "prepped"
+  parLevel       Float         // Minimum quantity to maintain
+  currentLevel   Float         @default(0) // Current quantity on hand
+  unit           String        // e.g., "each", "pint", "quart", "pan", "lb", "oz", "gallon"
+  notes          String?       // Special instructions or notes
+  sortOrder      Int           @default(0) // For custom ordering on prep sheets
+  isActive       Boolean       @default(true) // Soft delete / hide from active list
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Organization ownership
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Track prep history
+  prepLogs       PrepLog[]
+
+  @@map("prep_item")
+}
+
+// Log of prep completions for tracking history
+model PrepLog {
+  id             String    @id @default(uuid())
+  prepItemId     String
+  prepItem       PrepItem  @relation(fields: [prepItemId], references: [id], onDelete: Cascade)
+  quantityPrepped Float    // Amount that was prepped
+  preppedBy      String?   // Who did the prep (name or user ID)
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  @@map("prep_log")
+}
+
+// Cycle Count for inventory verification
+model CycleCount {
+  id              String              @id @default(uuid())
+  name            String              // e.g., "Weekly Count - Jan 27"
+  status          String              @default("in_progress") // in_progress, completed, cancelled
+  startedAt       DateTime            @default(now())
+  completedAt     DateTime?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Organization ownership
+  organizationId  String?
+  organization    Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Individual item counts
+  items           CycleCountItem[]
+
+  @@map("cycle_count")
+}
+
+// Individual item counts within a cycle count
+model CycleCountItem {
+  id              String        @id @default(uuid())
+  cycleCountId    String
+  cycleCount      CycleCount    @relation(fields: [cycleCountId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  expectedQty     Int           // Quantity expected (from system)
+  countedQty      Int?          // Quantity actually counted
+  variance        Int?          // Difference (counted - expected)
+  notes           String?
+  countedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([cycleCountId, inventoryItemId])
+  @@map("cycle_count_item")
+}
+
+// Vendor for ordering supplies
+model Vendor {
+  id             String    @id @default(uuid())
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Organization ownership
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Products this vendor supplies
+  products       VendorProduct[]
+  orders         Order[]
+
+  @@map("vendor")
+}
+
+// Links vendors to inventory items they supply
+model VendorProduct {
+  id              String        @id @default(uuid())
+  vendorId        String
+  vendor          Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  vendorSku       String?       // Vendor's SKU/product code
+  unitCost        Float?        // Cost per unit from this vendor
+  minOrderQty     Int?          // Minimum order quantity
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([vendorId, inventoryItemId])
+  @@map("vendor_product")
+}
+
+// Purchase Order
+model Order {
+  id             String       @id @default(uuid())
+  orderNumber    String       // Auto-generated order number
+  vendorId       String
+  vendor         Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  status         String       @default("draft") // draft, submitted, received, cancelled
+  notes          String?
+  submittedAt    DateTime?
+  receivedAt     DateTime?
+  totalAmount    Float?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Organization ownership
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Order line items
+  items          OrderItem[]
+
+  @@map("order")
+}
+
+// Order line items
+model OrderItem {
+  id              String        @id @default(uuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  quantity        Int
+  unitCost        Float?
+  totalCost       Float?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("order_item")
+}
