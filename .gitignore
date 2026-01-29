@@ -43,3 +43,5 @@ yarn-error.*
 # Expo log
 expo.log
 .env
+backend/prisma/dev.db*
+backend/uploads/*
