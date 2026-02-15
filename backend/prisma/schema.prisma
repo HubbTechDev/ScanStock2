@@ -21,28 +21,13 @@ model User {
   updatedAt     DateTime  @default(now()) @updatedAt
   sessions      Session[]
   accounts      Account[]
+   scanSessions  ScanSession[]   //
 
   Profile Profile?
 
   // Organization membership
   organizationMemberships OrganizationMember[]
 
-  @@map("user")
-}
-
-model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([token])
-  @@map("session")
 }
 
 model Account {
@@ -84,11 +69,11 @@ model Profile {
 
 // Organization for team-based inventory sharing
 model Organization {
-  id          String   @id @default(uuid())
-  name        String
-  inviteCode  String   @unique // 6-character code for joining
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  name       String
+  inviteCode String   @unique // 6-character code for joining
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   members        OrganizationMember[]
   inventoryItems InventoryItem[]
@@ -115,24 +100,24 @@ model OrganizationMember {
 }
 
 model InventoryItem {
-  id             String        @id @default(uuid())
-  name           String
-  description    String?
-  imageUrl       String
-  binNumber      String
-  rackNumber     String
-  platform       String
-  status         String        @default("pending") // pending, completed, sold
-  quantity       Int           @default(1)        // Quantity of items
-  parLevel       Int?          // Minimum quantity to maintain
-  cost           Float?        // Cost of goods (purchase price)
-  soldAt         DateTime?
-  soldPrice      Float?
-  shipByDate     DateTime?
-  shipperQrCode  String?       // URL to the shipper's QR code image
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  reminders      Reminder[]
+  id              String           @id @default(uuid())
+  name            String
+  description     String?
+  imageUrl        String
+  binNumber       String
+  rackNumber      String
+  platform        String
+  status          String           @default("pending") // pending, completed, sold
+  quantity        Int              @default(1) // Quantity of items
+  parLevel        Int? // Minimum quantity to maintain
+  cost            Float? // Cost of goods (purchase price)
+  soldAt          DateTime?
+  soldPrice       Float?
+  shipByDate      DateTime?
+  shipperQrCode   String? // URL to the shipper's QR code image
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  reminders       Reminder[]
   cycleCountItems CycleCountItem[]
   vendorProducts  VendorProduct[]
   orderItems      OrderItem[]
@@ -145,74 +130,74 @@ model InventoryItem {
 }
 
 model Reminder {
-  id              String        @id @default(uuid())
-  itemId          String
-  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  reminderDate    DateTime
-  note            String?
-  isCompleted     Boolean       @default(false)
-  notificationId  String?       // Expo notification identifier for cancellation
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String        @id @default(uuid())
+  itemId         String
+  item           InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  reminderDate   DateTime
+  note           String?
+  isCompleted    Boolean       @default(false)
+  notificationId String? // Expo notification identifier for cancellation
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@map("reminder")
 }
 
 // Prep Item for restaurant prep sheets
 model PrepItem {
-  id             String        @id @default(uuid())
-  name           String
-  category       String        // e.g., "Produce", "Meat", "Dairy"
-  itemType       String        @default("ingredient") // "ingredient" or "prepped"
-  parLevel       Float         // Minimum quantity to maintain
-  currentLevel   Float         @default(0) // Current quantity on hand
-  unit           String        // e.g., "each", "pint", "quart", "pan", "lb", "oz", "gallon"
-  notes          String?       // Special instructions or notes
-  sortOrder      Int           @default(0) // For custom ordering on prep sheets
-  isActive       Boolean       @default(true) // Soft delete / hide from active list
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  category     String // e.g., "Produce", "Meat", "Dairy"
+  itemType     String   @default("ingredient") // "ingredient" or "prepped"
+  parLevel     Float // Minimum quantity to maintain
+  currentLevel Float    @default(0) // Current quantity on hand
+  unit         String // e.g., "each", "pint", "quart", "pan", "lb", "oz", "gallon"
+  notes        String? // Special instructions or notes
+  sortOrder    Int      @default(0) // For custom ordering on prep sheets
+  isActive     Boolean  @default(true) // Soft delete / hide from active list
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Organization ownership
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Track prep history
-  prepLogs       PrepLog[]
+  prepLogs PrepLog[]
 
   @@map("prep_item")
 }
 
 // Log of prep completions for tracking history
 model PrepLog {
-  id             String    @id @default(uuid())
-  prepItemId     String
-  prepItem       PrepItem  @relation(fields: [prepItemId], references: [id], onDelete: Cascade)
-  quantityPrepped Float    // Amount that was prepped
-  preppedBy      String?   // Who did the prep (name or user ID)
-  notes          String?
-  createdAt      DateTime  @default(now())
+  id              String   @id @default(uuid())
+  prepItemId      String
+  prepItem        PrepItem @relation(fields: [prepItemId], references: [id], onDelete: Cascade)
+  quantityPrepped Float // Amount that was prepped
+  preppedBy       String? // Who did the prep (name or user ID)
+  notes           String?
+  createdAt       DateTime @default(now())
 
   @@map("prep_log")
 }
 
 // Cycle Count for inventory verification
 model CycleCount {
-  id              String              @id @default(uuid())
-  name            String              // e.g., "Weekly Count - Jan 27"
-  status          String              @default("in_progress") // in_progress, completed, cancelled
-  startedAt       DateTime            @default(now())
-  completedAt     DateTime?
-  notes           String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id          String    @id @default(uuid())
+  name        String // e.g., "Weekly Count - Jan 27"
+  status      String    @default("in_progress") // in_progress, completed, cancelled
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Organization ownership
-  organizationId  String?
-  organization    Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Individual item counts
-  items           CycleCountItem[]
+  items CycleCountItem[]
 
   @@map("cycle_count")
 }
@@ -224,9 +209,9 @@ model CycleCountItem {
   cycleCount      CycleCount    @relation(fields: [cycleCountId], references: [id], onDelete: Cascade)
   inventoryItemId String
   inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  expectedQty     Int           // Quantity expected (from system)
-  countedQty      Int?          // Quantity actually counted
-  variance        Int?          // Difference (counted - expected)
+  expectedQty     Int // Quantity expected (from system)
+  countedQty      Int? // Quantity actually counted
+  variance        Int? // Difference (counted - expected)
   notes           String?
   countedAt       DateTime?
   createdAt       DateTime      @default(now())
@@ -238,23 +223,23 @@ model CycleCountItem {
 
 // Vendor for ordering supplies
 model Vendor {
-  id             String    @id @default(uuid())
-  name           String
-  contactName    String?
-  email          String?
-  phone          String?
-  address        String?
-  notes          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Organization ownership
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Products this vendor supplies
-  products       VendorProduct[]
-  orders         Order[]
+  products VendorProduct[]
+  orders   Order[]
 
   @@map("vendor")
 }
@@ -266,9 +251,9 @@ model VendorProduct {
   vendor          Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   inventoryItemId String
   inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  vendorSku       String?       // Vendor's SKU/product code
-  unitCost        Float?        // Cost per unit from this vendor
-  minOrderQty     Int?          // Minimum order quantity
+  vendorSku       String? // Vendor's SKU/product code
+  unitCost        Float? // Cost per unit from this vendor
+  minOrderQty     Int? // Minimum order quantity
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -278,24 +263,24 @@ model VendorProduct {
 
 // Purchase Order
 model Order {
-  id             String       @id @default(uuid())
-  orderNumber    String       // Auto-generated order number
-  vendorId       String
-  vendor         Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  status         String       @default("draft") // draft, submitted, received, cancelled
-  notes          String?
-  submittedAt    DateTime?
-  receivedAt     DateTime?
-  totalAmount    Float?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id          String    @id @default(uuid())
+  orderNumber String // Auto-generated order number
+  vendorId    String
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  status      String    @default("draft") // draft, submitted, received, cancelled
+  notes       String?
+  submittedAt DateTime?
+  receivedAt  DateTime?
+  totalAmount Float?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Organization ownership
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Order line items
-  items          OrderItem[]
+  items OrderItem[]
 
   @@map("order")
 }
@@ -315,4 +300,46 @@ model OrderItem {
   updatedAt       DateTime      @updatedAt
 
   @@map("order_item")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  token        String   @unique
+  userId       String
+  expiresAt    DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+
+model ScanSession {
+  id        String   @id @default(cuid())
+  userId    String
+  imageUrl  String?
+  status    String   @default("uploaded") // uploaded | processing | done | confirmed | failed
+  createdAt DateTime @default(now())
+
+  results ScanResult[]
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ScanResult {
+  id            String @id @default(cuid())
+  scanSessionId String
+
+  label      String
+  count      Int
+  confidence Float?
+
+  // optional: link to a created InventoryItem later
+  inventoryItemId String?
+
+  scanSession ScanSession @relation(fields: [scanSessionId], references: [id], onDelete: Cascade)
+
+  @@index([scanSessionId])
 }

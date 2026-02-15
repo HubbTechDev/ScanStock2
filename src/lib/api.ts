@@ -15,14 +15,24 @@ import { authClient } from "./authClient";
 /**
  * Backend URL Configuration
  *
- * The backend URL is dynamically set by the Vibecode environment at runtime.
- * Format: https://[UNIQUE_ID].share.sandbox.dev/
- * This allows the app to connect to different backend instances without code changes.
+ * Vibecode sets EXPO_PUBLIC_VIBECODE_BACKEND_URL in their environment.
+ * When running locally (Expo Go on iPhone), we fall back to a LAN URL.
  */
-const BACKEND_URL = process.env.EXPO_PUBLIC_VIBECODE_BACKEND_URL;
-if (!BACKEND_URL) {
-  throw new Error("Backend URL setup has failed. Please contact support@vibecodeapp.com for help.");
-}
+
+// 1) Vibecode env (if present)
+const VIBECODE_URL = process.env.EXPO_PUBLIC_VIBECODE_BACKEND_URL;
+
+// 2) Optional custom env you can set yourself
+const CUSTOM_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+// 3) Hard fallback for local dev (your PC IP + backend port)
+const FALLBACK_URL = "http://192.168.68.55:3334";
+
+// Pick first non-empty
+const BACKEND_URL = (VIBECODE_URL || CUSTOM_URL || FALLBACK_URL).replace(/\/$/, "");
+
+// Optional: log once so you can confirm what the phone is using
+console.log("[api] BACKEND_URL =", BACKEND_URL);
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -62,22 +72,16 @@ const fetchFn = async <T>(path: string, options: FetchOptions): Promise<T> => {
   // Step 2: Make the HTTP request
   try {
     // Construct the full URL by combining the base backend URL with the endpoint path
-    const response = await fetch(`${BACKEND_URL}${path}`, {
-      method,
-      headers: {
-        // Always send JSON content type since our API uses JSON
-        "Content-Type": "application/json",
-        // Include authentication cookies if available
-        Cookie: cookies,
-      },
-      // Stringify the body if present (for POST, PUT, PATCH requests)
-      body: body ? JSON.stringify(body) : undefined,
-      // Use "omit" to prevent browser from automatically sending credentials
-      // We manually handle cookies via the Cookie header for more control
-      credentials: "omit",
-    });
+   const response = await fetch(`${BACKEND_URL}${path}`, {
+  method,
+  headers: {
+    "Content-Type": "application/json",
+    ...(options?.headers ?? {}),
+  },
+  body: body ? JSON.stringify(body) : undefined,
+});
 
-    // Step 3: Error handling - Check if the response was successful
+     // Step 3: Error handling - Check if the response was successful
     if (!response.ok) {
       // Parse the error details from the response body
       const errorData = await response.json();

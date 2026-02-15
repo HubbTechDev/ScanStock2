@@ -1,94 +1,77 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { Home, Package, Scan, BarChart3, ClipboardList } from 'lucide-react-native';
-import { useIndustryStore, INDUSTRY_CONFIGS } from '@/lib/industry-store';
+import React from "react";
+import { Tabs } from "expo-router";
+import { Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+const DARK_BG = "#0B1220";
+const DARK_CARD = "#0F172A";
+const DARK_BORDER = "#1F2937";
+const TEXT = "#E5E7EB";
+const MUTED = "#94A3B8";
+const ACCENT = "#10B981";
 
 export default function TabLayout() {
-  const industry = useIndustryStore((s) => s.industry);
-  const config = industry ? INDUSTRY_CONFIGS[industry] : null;
-
-  // Use industry color as accent, fallback to cyan
-  const accentColor = config?.color ?? '#06B6D4';
-
-  // Show prep sheet tab only for restaurant industry
-  const isRestaurant = industry === 'restaurant';
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: accentColor,
-        tabBarInactiveTintColor: '#64748B',
+        headerStyle: { backgroundColor: DARK_BG },
+        headerTitleStyle: { color: TEXT, fontWeight: "700" },
+        headerTintColor: TEXT,
+
         tabBarStyle: {
-          backgroundColor: '#1C1C1E',
-          borderTopColor: '#2C2C2E',
-          borderTopWidth: 1,
-          height: 85,
-          paddingBottom: 25,
+          backgroundColor: DARK_CARD,
+          borderTopColor: DARK_BORDER,
+          height: Platform.OS === "ios" ? 88 : 64,
           paddingTop: 10,
+          paddingBottom: Platform.OS === "ios" ? 24 : 10,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
-        headerStyle: {
-          backgroundColor: '#1C1C1E',
-        },
-        headerTintColor: '#F8FAFC',
-        headerTitleStyle: {
-          fontWeight: '700',
-        },
-      }}>
+        tabBarActiveTintColor: ACCENT,
+        tabBarInactiveTintColor: MUTED,
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="inventory"
         options={{
-          title: 'Inventory',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => <Package size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="prep-sheet"
-        options={{
-          title: 'Prep',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => <ClipboardList size={size} color={color} />,
-          href: isRestaurant ? '/prep-sheet' : null, // Only show for restaurant
+          title: "Inventory",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cube-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="smart-scan"
         options={{
-          title: 'SmartScan',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => <Scan size={size} color={color} />,
+          title: "Smart Scan",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="scan-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="analytics"
+        name="orders"
         options={{
-          title: 'Analytics',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => <BarChart3 size={size} color={color} />,
+          title: "Orders",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="receipt-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          href: null, // Hide from tabs - accessed via sidebar menu
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          href: null, // Hide from tabs but keep route accessible
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

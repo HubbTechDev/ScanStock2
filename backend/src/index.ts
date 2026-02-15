@@ -100,6 +100,11 @@ app.route("/api/vendors", vendorsRouter);
 console.log("📋 Mounting orders routes at /api/orders");
 app.route("/api/orders", ordersRouter);
 
+import { scanRoutes } from "./routes/scan";
+
+app.route("api/scan", scanRoutes);
+
+
 // Health check endpoint
 // Used by load balancers and monitoring tools to verify service is running
 app.get("/health", (c) => {
