@@ -1,177 +1,73 @@
-/**
- * API Client Module
- *
- * This module provides a centralized API client for making HTTP requests to the backend.
- * It handles authentication, request formatting, error handling, and response parsing.
- */
+// src/lib/api.ts
 
-// Import fetch from expo/fetch for React Native compatibility
-// This ensures fetch works correctly across different platforms (iOS, Android, Web)
-import { fetch } from "expo/fetch";
-
-// Import the authentication client to access user session cookies
-import { authClient } from "./authClient";
+import { BACKEND_URL } from "./config";
 
 /**
- * Backend URL Configuration
- *
- * Vibecode sets EXPO_PUBLIC_VIBECODE_BACKEND_URL in their environment.
- * When running locally (Expo Go on iPhone), we fall back to a LAN URL.
+ * Simple centralized API client
+ * No vibecode dependency
+ * No circular imports
  */
 
-// 1) Vibecode env (if present)
-const VIBECODE_URL = process.env.EXPO_PUBLIC_VIBECODE_BACKEND_URL;
-
-// 2) Optional custom env you can set yourself
-const CUSTOM_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-
-// 3) Hard fallback for local dev (your PC IP + backend port)
-const FALLBACK_URL = "http://192.168.68.55:3334";
-
-// Pick first non-empty
-const BACKEND_URL = (VIBECODE_URL || CUSTOM_URL || FALLBACK_URL).replace(/\/$/, "");
-
-// Optional: log once so you can confirm what the phone is using
-console.log("[api] BACKEND_URL =", BACKEND_URL);
-
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-
-type FetchOptions = {
-  method: HttpMethod;
-  body?: object; // Request body, will be JSON stringified before sending
+type RequestOptions = {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  body?: any;
+  headers?: Record<string, string>;
 };
 
-/**
- * Core Fetch Function
- *
- * A generic, type-safe wrapper around the fetch API that handles all HTTP requests.
- *
- * @template T - The expected response type (for type safety)
- * @param path - The API endpoint path (e.g., "/api/posts")
- * @param options - Configuration object containing HTTP method and optional body
- * @returns Promise resolving to the typed response data
- *
- * Features:
- * - Automatic authentication: Attaches session cookies from authClient
- * - JSON handling: Automatically stringifies request bodies and parses responses
- * - Error handling: Throws descriptive errors with status codes and messages
- * - Type safety: Returns strongly-typed responses using TypeScript generics
- *
- * @throws Error if the response is not ok (status code outside 200-299 range)
- */
-const fetchFn = async <T>(path: string, options: FetchOptions): Promise<T> => {
-  const { method, body } = options;
-  // Step 1: Authentication - Retrieve session cookies from the auth client
-  // These cookies are used to identify the user and maintain their session
-  const headers = new Map<string, string>();
-  const cookies = authClient.getCookie();
-  if (cookies) {
-    headers.set("Cookie", cookies);
-  }
+async function request<T = any>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const { method = "GET", body, headers = {} } = options;
 
-  // Step 2: Make the HTTP request
+  const url = `${BACKEND_URL}${path}`;
+
   try {
-    // Construct the full URL by combining the base backend URL with the endpoint path
-   const response = await fetch(`${BACKEND_URL}${path}`, {
-  method,
-  headers: {
-    "Content-Type": "application/json",
-    ...(options?.headers ?? {}),
-  },
-  body: body ? JSON.stringify(body) : undefined,
-});
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
-     // Step 3: Error handling - Check if the response was successful
     if (!response.ok) {
-      // Parse the error details from the response body
-      const errorData = await response.json();
-      // Throw a descriptive error with status code, status text, and server error data
-      throw new Error(
-        `[api.ts]: ${response.status} ${response.statusText} ${JSON.stringify(errorData)}`,
-      );
+      const text = await response.text();
+      throw new Error(`API ${response.status}: ${text}`);
     }
 
-    // Step 4: Parse and return the successful response as JSON
-    // The response is cast to the expected type T for type safety
-    return response.json() as Promise<T>;
+    // Handle empty response
+    const contentType = response.headers.get("content-type");
+    if (contentType?.includes("application/json")) {
+      return response.json();
+    }
+
+    return response.text() as unknown as T;
   } catch (error: any) {
-    // Log the error for debugging purposes
-    console.log(`[api.ts]: ${error}`);
-    // Re-throw the error so the calling code can handle it appropriately
+    console.log("[api.ts] Error:", error?.message || error);
     throw error;
   }
-};
+}
 
 /**
- * API Client Object
- *
- * Provides convenient methods for making HTTP requests with different methods.
- * Each method is a thin wrapper around fetchFn with the appropriate HTTP verb.
- *
- * Usage Examples:
- *
- * // GET request - Fetch data
- * const posts = await api.get<Post[]>('/api/posts');
- *
- * // POST request - Create new data
- * const newPost = await api.post<Post>('/api/posts', {
- *   title: 'My Post',
- *   content: 'Hello World'
- * });
- *
- * // PUT request - Replace existing data
- * const updatedPost = await api.put<Post>('/api/posts/123', {
- *   title: 'Updated Title',
- *   content: 'Updated Content'
- * });
- *
- * // PATCH request - Partially update existing data
- * const patchedPost = await api.patch<Post>('/api/posts/123', {
- *   title: 'New Title Only'
- * });
- *
- * // DELETE request - Remove data
- * await api.delete('/api/posts/123');
+ * Public API helpers
  */
-const api = {
-  /**
-   * GET - Retrieve data from the server
-   * @template T - Expected response type
-   * @param path - API endpoint path
-   */
-  get: <T>(path: string) => fetchFn<T>(path, { method: "GET" }),
+export const api = {
+  get: <T = any>(path: string) =>
+    request<T>(path, { method: "GET" }),
 
-  /**
-   * POST - Create new data on the server
-   * @template T - Expected response type
-   * @param path - API endpoint path
-   * @param body - Optional request body containing data to create
-   */
-  post: <T>(path: string, body?: object) => fetchFn<T>(path, { method: "POST", body }),
+  post: <T = any>(path: string, body?: any) =>
+    request<T>(path, { method: "POST", body }),
 
-  /**
-   * PUT - Replace existing data on the server
-   * @template T - Expected response type
-   * @param path - API endpoint path
-   * @param body - Optional request body containing data to replace
-   */
-  put: <T>(path: string, body?: object) => fetchFn<T>(path, { method: "PUT", body }),
+  put: <T = any>(path: string, body?: any) =>
+    request<T>(path, { method: "PUT", body }),
 
-  /**
-   * PATCH - Partially update existing data on the server
-   * @template T - Expected response type
-   * @param path - API endpoint path
-   * @param body - Optional request body containing partial data to update
-   */
-  patch: <T>(path: string, body?: object) => fetchFn<T>(path, { method: "PATCH", body }),
+  patch: <T = any>(path: string, body?: any) =>
+    request<T>(path, { method: "PATCH", body }),
 
-  /**
-   * DELETE - Remove data from the server
-   * @template T - Expected response type
-   * @param path - API endpoint path
-   */
-  delete: <T>(path: string) => fetchFn<T>(path, { method: "DELETE" }),
+  delete: <T = any>(path: string) =>
+    request<T>(path, { method: "DELETE" }),
 };
 
-// Export the API client and backend URL to be used in other modules
-export { api, BACKEND_URL };
+export { BACKEND_URL };
